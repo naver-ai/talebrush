@@ -1,0 +1,9 @@
+#nsml: joshlk/deepspeed:pytorch-1.7.1-cuda-10.2
+tensorboardX
+tensorboard
+scikit-learn
+seqeval
+flask-ngrok
+flask_api
+flask_cors
+transformers==4.6.0

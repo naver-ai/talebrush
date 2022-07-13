@@ -1,0 +1,99 @@
+/* TaleBrush 
+Copyright (c) 2022-present NAVER Corp.
+GPLv3 */
+
+body, html {
+  height: 100%;
+  width: 100%;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Open Sans;
+  touch-action: none;
+}
+
+.canvas{
+  position: absolute;
+  top: 0px;
+  left: 4px;
+  height: 100%;
+  width: calc(100% - 4px);
+}
+
+.commonText{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 65px);
+  background-color: 'transparent';
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  line-height: 1.2;
+}
+
+.sentence_dot{
+  position: absolute;
+  width: 1%;
+  height: 1%;
+  border-radius: 10px;
+  border: solid 2px black;
+}
+
+.sentence_bar{
+  position: absolute;
+  height: 100%;
+  width: 4px;
+  background-color: white;
+  pointer-events: none;
+}
+
+.noselect {
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Old versions of Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Edge, Opera and Firefox */
+  /* user-drag: none;  */
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+.nodrag {
+  user-drag: none; 
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+#textarea{
+  --rough-border-width: 3;
+}
+
+textarea:focus {
+  outline: none;
+}
+
+
+.container {
+  position: relative;
+}
+
+a:focus { outline:none; }
+/* 
+
+#TB_canvas {
+  cursor: url(../../img/cursor_b.png), auto;
+} */
