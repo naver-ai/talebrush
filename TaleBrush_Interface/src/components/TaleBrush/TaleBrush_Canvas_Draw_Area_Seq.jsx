@@ -13,6 +13,13 @@ export default class TaleBrush_Canvas_Draw_Area_Seq extends React.Component {
     };
   }
 
+  // Pointer position inside the drawing area, 0-1 (y up). Viewport coordinates on both sides:
+  // pageX/pageY include the document scroll, getBoundingClientRect() does not.
+  pointerPos(e){
+    var r = e.currentTarget.getBoundingClientRect()
+    return [(e.clientX-r.left)/r.width, 1-(e.clientY-r.top)/r.height]
+  }
+
   SeqDrawBegin(e){
     if(this.props.mother_state.being_generated){
       return
@@ -35,8 +42,7 @@ export default class TaleBrush_Canvas_Draw_Area_Seq extends React.Component {
         }
         
         this.props.mother_state.old_controls = JSON.parse(JSON.stringify(this.props.mother_state.controls[this.props.mother_state.cur_path_id]))
-        var x = (e.pageX-document.getElementById('drawer_'+this.props.val['_id']).getBoundingClientRect().left)/document.getElementById('drawer_'+this.props.val['_id']).offsetWidth
-        var y = 1-(e.pageY-document.getElementById('drawer_'+this.props.val['_id']).getBoundingClientRect().top)/document.getElementById('drawer_'+this.props.val['_id']).offsetHeight
+        var [x, y] = this.pointerPos(e)
         this.props.mother_this.setState({mode_state: 'seq_draw', seq_draw_char: this.props.val['_id'], seq_draw_prev_pos: [x, y], seq_draw_prev_time: Date.now(), accum_time:0, accum_dist:0})
       }
   }
@@ -45,7 +51,7 @@ export default class TaleBrush_Canvas_Draw_Area_Seq extends React.Component {
   SeqDraw(e){
     e.stopPropagation();
     var val = this.props.val
-    var x = (e.pageX-document.getElementById('drawer_'+this.props.val['_id']).getBoundingClientRect().left)/document.getElementById('drawer_'+this.props.val['_id']).offsetWidth
+    var [x, y] = this.pointerPos(e)
     var cx = x*this.props.mother_state.total_length
 
     var _this = this
@@ -55,7 +61,6 @@ export default class TaleBrush_Canvas_Draw_Area_Seq extends React.Component {
     // this.props.mother_this.setState({sent_highlighted: Math.round(cx)})
     
     if(this.props.mother_state.mode_state=='seq_draw' && this.props.mother_state.seq_draw_char==this.props.val['_id']){
-      var y = 1-(e.pageY-document.getElementById('drawer_'+this.props.val['_id']).getBoundingClientRect().top)/document.getElementById('drawer_'+this.props.val['_id']).offsetHeight
       // if(x>this.props.mother_state.text_prompt_range/this.props.mother_state.total_length){
         
         var px = this.props.mother_state.seq_draw_prev_pos[0]*this.props.mother_state.total_length
