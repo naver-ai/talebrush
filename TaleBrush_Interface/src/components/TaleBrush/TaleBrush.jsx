@@ -75,7 +75,6 @@ export default class TaleBrush extends React.Component {
       added_control_ids: [], 
       original_controls: {},
 
-      video: false,
     };
   }
 
@@ -247,15 +246,7 @@ export default class TaleBrush extends React.Component {
       text_parsed['0'][0]={'sentence': "Jack's favorite animal is panda.", 'protagonist': 0.729}
       text_parsed['0'][1]={'sentence': "Therefore, Jack went to a zoo to see pandas.", 'protagonist': 0.6323}
       this.state.text= ">Jack's favorite animal is panda.\n>Therefore, Jack went to a zoo to see pandas.\n>\n>\n>\n>\n>\n>"
-    }else if(task=='video'){
-      char_name='Emma'
-      text_parsed['0'][0]={'sentence': "Emma always wanted to be a famous actress, but lacked talent in acting.", 'protagonist': 0.3477}
-      // text_parsed['0'][1]={'sentence': "Therefore, Jack went to a zoo to see pandas.", 'protagonist': 0.6323}
-      this.state.text= ">Emma always wanted to be a famous actress, but lacked talent in acting.\n>\n>\n>\n>\n>\n>\n>"
-      this.setState({video:true})
     }
-
-    
 
     this.setState({text_parsed, user, logging, characters: [{_id:'protagonist', name:char_name}]}, function(){
       var init_state = JSON.parse(JSON.stringify(_this.state))

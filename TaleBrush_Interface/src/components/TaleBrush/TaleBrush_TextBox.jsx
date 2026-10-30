@@ -5,7 +5,6 @@
 import React from 'react';
 import M from 'materialize-css'
 import TaleBrush_TextBox_Text from './TaleBrush_TextBox_Text';
-import TaleBrush_TextBox_Param from './TaleBrush_TextBox_Param';
 import logo from '../../img/logo.png';
 
 export default class TaleBrush_TextBox extends React.Component {

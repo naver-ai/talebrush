@@ -4,67 +4,115 @@
 
 import axios from 'axios'
 
-var video_cont = ['She was very shy about singing and acting at school.',
-    'When she found an audition for a musical during summer vacation, she decided to try out.',
-    'She sang the role of a girl named Donna in her second attempt at music.',
-    'After so much work and determination on the part, Emma earned success!',
-    'She received offers from several companies to sing locally over summer vacation.',
-    'Unfortunately, she lost all of her dreams as well as many potential opportunities due to this loss of confidence in her singing ability and inability to hold auditions with teachers or coaches for upcoming auditions.',
-    'Now Emma no longer wants to pursue singing because of this incident.'
-    ]
-var video_cont_val = [0.3882, 0.6104, 0.9438, 1, 0.6865, 0.4189, 0.2401]
-var video_cont_idx = 0
+// Readable message for a failed API call (server returns {error: ...} on LLM/provider failures).
+function errorMessage(error){
+    if(error.response && error.response.data && error.response.data.error){
+        return error.response.data.error
+    }
+    return error.message || 'Error occurred while generating!'
+}
 
+// The relationship track only takes part when it is shown and both characters exist.
+export function relationshipActive(state){
+    return state.relationship_in_panel==true && state.characters.length==2
+}
 
-var video_cont_e = ['She barely sang that day as others took seats in the auditorium waiting their turn.',
-    'She never went on stage again after that day!'
-    ]
-var video_cont_e_val = [0.243, 0.122]
-var video_cont_e_idx = 0
+// {name: 0-100 or -1 (no target), _relationship?: 0-100} for sentence i of the current path.
+function collectTargets(state, i){
+    var controls = state.controls[state.cur_path_id]
+    var targets = {}
+    state.characters.forEach(function(c){
+        var v = controls[c['_id']]!=undefined ? controls[c['_id']][i] : undefined
+        targets[c['name']] = (v!=undefined) ? Math.round(v*100) : -1
+    })
+    if(relationshipActive(state) && controls['_relationship']!=undefined && controls['_relationship'][i]!=undefined){
+        targets['_relationship'] = Math.round(controls['_relationship'][i]*100)
+    }
+    return targets
+}
 
-var val_infill = [
-    "When the opportunity came up less than a month later, Emma didn't know how to prepare herself properly or how much practice would be necessary before actually auditioning.",
-    "She got upset when there were no teachers at school who would help prepare her vocal skills needed for auditions.",
-    "She did so little preparation and by the time it came time, all her hopes fell through ashes when there were too many other interested singers vying for slots along with herself."
-]
-var val_infill_idxs = [2, 0, 1]
-var val_infill_val = [0.4141, 0.42, 0.2500]
-var val_infill_idx = 0
+// Shared tracks: temperature from _surprise, retries from _regeneration.
+function collectShared(state, i){
+    var controls = state.controls[state.cur_path_id]
+    var temp = (controls['_surprise']!=undefined && controls['_surprise'][i]!=undefined) ? controls['_surprise'][i] : 0.7
+    var rval = (controls['_regeneration']!=undefined) ? controls['_regeneration'][i] : undefined
+    return {temp: temp, regen: (rval==undefined || rval<2) ? 1 : rval}
+}
 
-export function fortuneRecognition(_this, idx, character){
+// Store a returned {name: 0-100, relationship: n} rating dict into a text_parsed row under character ids.
+function applyValues(state, row, values){
+    state.characters.forEach(function(c){
+        if(values[c['name']]!=undefined){
+            row[c['_id']] = values[c['name']]/100
+        }
+    })
+    if(relationshipActive(state) && values['relationship']!=undefined){
+        row['_relationship'] = values['relationship']/100
+    }
+}
+
+// Ratings (0-100, by name) of an already rated sentence; lets the prompt say rising/falling/steady.
+function prevValues(state, idx){
+    var row = state.text_parsed[state.cur_path_id][idx]
+    var prev = {}
+    if(row==undefined){
+        return prev
+    }
+    state.characters.forEach(function(c){
+        if(row[c['_id']]!=undefined){
+            prev[c['name']] = Math.round(row[c['_id']]*100)
+        }
+    })
+    if(row['_relationship']!=undefined){
+        prev['relationship'] = Math.round(row['_relationship']*100)
+    }
+    return prev
+}
+
+// True when a non-empty sentence still lacks a rating for any character (or the relationship).
+export function needsRating(state, row){
+    if(row==undefined || row['sentence']==undefined || row['sentence'].length<=1){
+        return false
+    }
+    var missing = state.characters.some(function(c){ return row[c['_id']]==undefined })
+    return missing || (relationshipActive(state) && row['_relationship']==undefined)
+}
+
+// One labelSentence call rates the sentence for every character (and the relationship).
+export function fortuneRecognition(_this, idx){
+    var state = _this.props.mother_state
+    var path_id = state.cur_path_id
     var idx_min = parseInt(idx)-1
     if (idx_min<0){
         idx_min = 0
     }
-        // var idx_min = 0
     var pre_context = ''
-        // console.log(this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id])
     for(var j=idx_min; j<idx; j++){
-        // console.log(j)
-        if(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][j]['sentence']=='' || _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][j]['sentence']==undefined){
+        if(state.text_parsed[path_id][j]['sentence']=='' || state.text_parsed[path_id][j]['sentence']==undefined){
             pre_context = ''
         }else{
-            pre_context = pre_context + _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][j]['sentence']
+            pre_context = pre_context + state.text_parsed[path_id][j]['sentence']
         }
     }
 
-        axios('/api/labelSentence', {
-          method: 'POST',
-          data: {
-            sentence: _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][idx]['sentence'],
-            pre_context:pre_context,
-            character: _this.props.mother_state.characters[0]['name'],
-          }
-        })
-        .then(function(response){
-          console.log(response['data'])
-          _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][idx][character['_id']] = response['data']['value']/100
-          _this.props.mother_this.setState({}, function(){
-            _this.props.mother_this.storeState('text_update')
-            _this.props.mother_this.highlightSentence(_this.props.mother_state.text, _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id])
-          })
-          
-        })
+    axios('/api/labelSentence', {
+      method: 'POST',
+      data: {
+        sentence: state.text_parsed[path_id][idx]['sentence'],
+        pre_context: pre_context,
+        characters: state.characters.map(function(c){ return c['name'] }),
+        include_relationship: relationshipActive(state),
+      }
+    })
+    .then(function(response){
+      applyValues(state, state.text_parsed[path_id][idx], response['data']['values'])
+      _this.props.mother_this.setState({}, function(){
+        _this.props.mother_this.storeState('text_update')
+        _this.props.mother_this.highlightSentence(state.text, state.text_parsed[path_id])
+      })
+    }).catch(function(error){
+      alert(errorMessage(error))
+    })
 }
 
 
@@ -138,517 +186,201 @@ function continuing_call(_this, pre_context, controls, characters, temperature, 
         _this.props.mother_this.setState({being_generated:false}, function(){
             _this.props.mother_this.storeState('generate_continuation')
         })
-        
         return
-    }else{
-        var control = controls.shift()
-        var temp = temperature.shift()
-        var regen = regeneration.shift()
-
-        /////////// when machine not connecte ////
-        // var generated = ['generated']
-        // var values = [Math.random()]
-        
-        // var text_parsed_new = JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-    
-        // for(var i in generated){
-        //     i = parseInt(i)
-        //     console.log(i+init_idx+1, i)
-        //     pre_context.push(generated[i])
-        //     if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
-        //         text_parsed_new[i+init_idx+1]={
-        //             'sentence': generated[i],
-        //             'protagonist': values[i],
-        //         }
-        //     }
-            
-            
-        //     // document.getElementById('sentence_box_'+(i+front_end+1).toString()).value = generated[i]
-        // }
-        // _this.props.mother_state.text_parsed[new_key] = text_parsed_new
-        // console.log('new parsed',_this.props.mother_state.text_parsed)
-        // _this.props.mother_this.setState({cur_path_id:new_key}, function(){
-        //     if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
-        //         insertASentenceToTextbox(_this, init_idx+1)
-        //     }
-            
-        //     continuing_call(_this, pre_context, controls, characters, temperature, new_key, init_idx+1, pick_ids)
-        // })
-        
-        
-        // return
-        ///////////
-
-
-        ///////////////////// Below when machine is connecte
-        if(_this.props.mother_state.video==false){
-            axios('/api/continuingGeneration', {
-                method: 'POST',
-                data: {
-                    pre_context: JSON.stringify(pre_context),
-                    controls: JSON.stringify([control]),
-                    characters: JSON.stringify(characters),
-                    temperature: JSON.stringify([temp]),
-                    regeneration: JSON.stringify([regen]),
-                }
-            })
-            .then(function(response){
-                var generated = JSON.parse(response.data['generated'])
-                var values = JSON.parse(response.data['values'])
-                
-                var text_parsed_new = JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-            
-                for(var i in generated){
-                    i = parseInt(i)
-                    // console.log(i+init_idx+1, i)
-                    pre_context.push(generated[i])
-                    if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
-                        text_parsed_new[i+init_idx+1]={
-                            'sentence': generated[i],
-                            'protagonist': values[i]/100,
-                        }
-                    }
-                    
-                    // document.getElementById('sentence_box_'+(i+front_end+1).toString()).value = generated[i]
-                }
-                _this.props.mother_state.text_parsed[new_key] = text_parsed_new
-                // console.log(_this.props.mother_state.text_parsed)
-                _this.props.mother_this.setState({cur_path_id:new_key}, function(){
-                    if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
-                        insertASentenceToTextbox(_this, init_idx+1)
-                    }
-                    continuing_call(_this, pre_context, controls, characters, temperature, regeneration, new_key, init_idx+1, pick_ids)
-                })
-                
-                // _this.continuing_call(pre_context, controls, characters, temperature, new_key, init_idx+1)
-            }).catch(function(error){
-                alert('Error occurred while generating!')
-                _this.props.mother_this.setState({being_generated:false})
-            })
-            ///////////////////////////
-        }else{
-            setTimeout(function(){
-                if(control!='-1'){
-                    var generated = [video_cont[video_cont_idx]]
-                    var values = [video_cont_val[video_cont_idx]]
-                    video_cont_idx = video_cont_idx+1
-                }else{
-                    var generated = [video_cont_e[video_cont_e_idx]]
-                    var values = [video_cont_e_val[video_cont_e_idx]]
-                    video_cont_e_idx = video_cont_e_idx+1
-                }
-                
-                
-                var text_parsed_new = JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-            
-                for(var i in generated){
-                    i = parseInt(i)
-                    // console.log(i+init_idx+1, i)
-                    pre_context.push(generated[i])
-                    if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
-                        text_parsed_new[i+init_idx+1]={
-                            'sentence': generated[i],
-                            'protagonist': values[i],
-                        }
-                    }
-                    
-                    // document.getElementById('sentence_box_'+(i+front_end+1).toString()).value = generated[i]
-                }
-                _this.props.mother_state.text_parsed[new_key] = text_parsed_new
-                // console.log(_this.props.mother_state.text_parsed)
-                _this.props.mother_this.setState({cur_path_id:new_key}, function(){
-                    if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
-                        insertASentenceToTextbox(_this, init_idx+1)
-                    }
-                    continuing_call(_this, pre_context, controls, characters, temperature, regeneration, new_key, init_idx+1, pick_ids)
-                })
-            }, 1000)
-
-        }
-        
     }
-    
-  }
+    var control = controls.shift()
+    var temp = temperature.shift()
+    var regen = regeneration.shift()
 
- export function continuing_generation(_this, front_start, front_end, gen_end, pick_ids = []){
-    // var front_start = _this.props.mother_state.text_front_prompt_start
-    // var front_end = _this.props.mother_state.text_front_prompt_end
-    // var gen_end = _this.props.mother_state.text_generation_end
-    var pre_context = []
-    var controls = []
-    var temperature = []
-    var regeneration = []
-    // var old_controls = JSON.parse(JSON.stringify(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]))
-    for(var i=front_start; i<=front_end; i++){
-        if(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][i]['sentence']==''){
-            alert('Please fill in the context.')
-            return
+    axios('/api/continuingGeneration', {
+        method: 'POST',
+        data: {
+            pre_context: JSON.stringify(pre_context),
+            controls: JSON.stringify([control]),
+            characters: JSON.stringify(characters),
+            temperature: JSON.stringify([temp]),
+            regeneration: JSON.stringify([regen]),
+            prev_values: prevValues(_this.props.mother_state, init_idx),
         }
-        pre_context.push(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][i]['sentence'])
-    }
-    for(var i=front_end+1; i<=gen_end; i++){
-        if(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['protagonist']!=undefined){
-            if (_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['protagonist'][i]!=undefined){
-                var cval = Math.round(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['protagonist'][i]*100)
-                controls.push(cval.toString())
-            }else{
-                controls.push('-1')
-            }
-        }else{
-            controls.push('-1')
-        }
-        
-        if(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_surprise']!=undefined){
-            if (_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_surprise'][i]!=undefined){
-                var sval = _this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_surprise'][i]
-                temperature.push(sval)
-            }else{
-                temperature.push(0.7)
-            }
-        }else{
-            temperature.push(0.7)
-        }
+    })
+    .then(function(response){
+        var generated = JSON.parse(response.data['generated'])
+        var values = JSON.parse(response.data['values'])
+        var state = _this.props.mother_state
 
-        if(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_regeneration']!=undefined){
-            if (_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_regeneration'][i]!=undefined){
-                var rval = _this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_regeneration'][i]
-                if(rval<2){
-                    regeneration.push(1)
-                }else{
-                    regeneration.push(rval)
-                }
-                
-            }else{
-                regeneration.push(1)
+        var text_parsed_new = JSON.parse(JSON.stringify(state.text_parsed[state.cur_path_id]))
+
+        for(var i in generated){
+            i = parseInt(i)
+            pre_context.push(generated[i])
+            if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
+                text_parsed_new[i+init_idx+1] = {'sentence': generated[i]}
+                applyValues(state, text_parsed_new[i+init_idx+1], values[i])
             }
-        }else{
-            regeneration.push(1)
         }
-        
+        state.text_parsed[new_key] = text_parsed_new
+        _this.props.mother_this.setState({cur_path_id:new_key}, function(){
+            if(pick_ids.length==0 || pick_ids.indexOf(i+init_idx+1)!=-1){
+                insertASentenceToTextbox(_this, init_idx+1)
+            }
+            continuing_call(_this, pre_context, controls, characters, temperature, regeneration, new_key, init_idx+1, pick_ids)
+        })
+    }).catch(function(error){
+        alert(errorMessage(error))
+        _this.props.mother_this.setState({being_generated:false}, function(){
+            _this.props.mother_this.storeState('generate_error')
+        })
+    })
+}
+
+// Fill controls/temperature/regeneration lists for sentences from..to-1 (shared by both modes).
+function collectControls(state, from, to){
+    var controls = [], temperature = [], regeneration = []
+    for(var i=from; i<to; i++){
+        controls.push(collectTargets(state, i))
+        var shared = collectShared(state, i)
+        temperature.push(shared.temp)
+        regeneration.push(shared.regen)
     }
-    var characters = [_this.props.mother_state.characters[0]['name']]
-    // var gen_sen_num = gen_end-front_end
-    // console.log(_this.props.mother_state.controls)
-    // console.log(pre_context, controls, characters, temperature)
-    
+    return {controls: controls, temperature: temperature, regeneration: regeneration}
+}
+
+// Branch: copy every track/layer of the current path to a new path id; current path gets its pre-stroke controls back.
+function branchPath(_this){
+    var state = _this.props.mother_state
     var new_key = getNewPathId(_this)
-    _this.props.mother_state.controls[new_key] = JSON.parse(JSON.stringify(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]))
-    _this.props.mother_state.text_parsed[new_key]=JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-    _this.props.mother_state.controls[_this.props.mother_state.cur_path_id] = _this.props.mother_state.old_controls
-    
+    state.controls[new_key] = JSON.parse(JSON.stringify(state.controls[state.cur_path_id]))
+    state.text_parsed[new_key] = JSON.parse(JSON.stringify(state.text_parsed[state.cur_path_id]))
+    state.controls[state.cur_path_id] = state.old_controls
+    return new_key
+}
+
+function contextSentences(state, from, to){
+    var out = []
+    for(var i=from; i<=to; i++){
+        if(state.text_parsed[state.cur_path_id][i]['sentence']==''){
+            alert('Please fill in the context.')
+            return undefined
+        }
+        out.push(state.text_parsed[state.cur_path_id][i]['sentence'])
+    }
+    return out
+}
+
+function characterNames(state){
+    return state.characters.map(function(c){ return c['name'] })
+}
+
+export function continuing_generation(_this, front_start, front_end, gen_end, pick_ids = []){
+    var state = _this.props.mother_state
+    var pre_context = contextSentences(state, front_start, front_end)
+    if(pre_context==undefined){
+        return
+    }
+    var c = collectControls(state, front_end+1, gen_end+1)
+    var new_key = branchPath(_this)
+
     _this.props.mother_this.setState({
         being_generated: true,
         cur_path_id: new_key,
     }, function(){
-        
-        continuing_call(_this, pre_context, controls, characters, temperature, regeneration, new_key, front_end, pick_ids)
+        continuing_call(_this, pre_context, c.controls, characterNames(state), c.temperature, c.regeneration, new_key, front_end, pick_ids)
     })
-    
-    return
+}
 
-
-  }
-
-  function infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx, back_idx, is_front, pick_ids = []){
-    // console.log('pick ids!', pick_ids)
+function infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx, back_idx, is_front, pick_ids = []){
     if(controls.length==0){
         _this.props.mother_this.setState({being_generated:false}, function(){
             _this.props.mother_this.storeState('generate_infilling')
         })
-        
         return
+    }
+    var control, temp, regen
+    if(is_front){
+        control = controls.shift()
+        temp = temperature.shift()
+        regen = regeneration.shift()
     }else{
-        var control, temp, regen
-        // console.log(temperature)
-        if(is_front){
-            control = controls.shift()
-            temp = temperature.shift()
-            regen = regeneration.shift()
-        }else{
-            control = controls.pop()
-            temp = temperature.pop()
-            regen = regeneration.pop()
-        }
-
-
-        ////////////////
-        // var generated = ['generated']
-        // var values = [Math.random()]
-        
-        // var text_parsed_new = JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-    
-        // for(var i in generated){
-        //     i = parseInt(i)
-        //     // console.log(i+init_idx+1, i)
-        //     if(is_front){
-        //         pre_context.push(generated[i])
-        //         if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
-        //             text_parsed_new[i+front_idx+1]={
-        //                 'sentence': generated[i],
-        //                 'protagonist': values[i],
-        //             }
-        //         }
-                
-        //     }else{
-        //         post_context.unshift(generated[i])
-        //         if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
-        //             text_parsed_new[back_idx-generated.length+i]={
-        //                 'sentence': generated[i],
-        //                 'protagonist': values[i],
-        //             }
-        //         }
-        //     }
-            
-            
-        //     // document.getElementById('sentence_box_'+(i+front_end+1).toString()).value = generated[i]
-        // }
-        // _this.props.mother_state.text_parsed[new_key] = text_parsed_new
-        // // console.log('1',_this.props.mother_state.text_parsed)
-        // _this.props.mother_this.setState({cur_path_id:new_key}, function(){
-        //     if(is_front){
-        //         if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
-        //             insertASentenceToTextbox(_this, front_idx+1)
-        //         }
-        //         infilling_call(_this, pre_context, post_context, controls, characters, temperature, new_key, front_idx+1, back_idx, !is_front, pick_ids)
-        //     }else{
-        //         if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
-        //             insertASentenceToTextbox(_this, back_idx-1)
-        //         }
-        //         infilling_call(_this, pre_context, post_context, controls, characters, temperature, new_key, front_idx, back_idx-1, !is_front, pick_ids)
-        //     }
-        // })
-        // return
-        
-        ////////////////
-
-        if(_this.props.mother_state.video==false){
-            ////////////////////////////// When connected to a machine, below
-            axios('/api/infillingGeneration', {
-                method: 'POST',
-                data: {
-                    pre_context: JSON.stringify(pre_context),
-                    post_context: JSON.stringify(post_context),
-                    controls: JSON.stringify([control]),
-                    characters: JSON.stringify(characters),
-                    temperature: JSON.stringify([temp]),
-                    regeneration: JSON.stringify([regen]),
-                    is_front: is_front
-                }
-            })
-            .then(function(response){
-                var generated = JSON.parse(response.data['generated'])
-                var values = JSON.parse(response.data['values'])
-                
-                var text_parsed_new = JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-            
-                for(var i in generated){
-                    i = parseInt(i)
-                    // console.log(i+init_idx+1, i)
-                    if(is_front){
-                        
-                        pre_context.push(generated[i])
-                        if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
-                            text_parsed_new[i+front_idx+1]={
-                                'sentence': generated[i],
-                                'protagonist': values[i]/100,
-                            }
-                        }
-                        
-                    }else{
-                        post_context.unshift(generated[i])
-                        if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
-                            text_parsed_new[back_idx-generated.length+i]={
-                                'sentence': generated[i],
-                                'protagonist': values[i]/100,
-                            }
-                        }
-                        
-                    }
-                    
-                    
-                    // document.getElementById('sentence_box_'+(i+front_end+1).toString()).value = generated[i]
-                }
-                _this.props.mother_state.text_parsed[new_key] = text_parsed_new
-                // console.log('1',_this.props.mother_state.text_parsed)
-                _this.props.mother_this.setState({cur_path_id:new_key}, function(){
-                    if(is_front){
-                        if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
-                            insertASentenceToTextbox(_this, front_idx+1)
-                        }
-                        infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx+1, back_idx, !is_front, pick_ids)
-                    }else{
-                        if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
-                            insertASentenceToTextbox(_this, back_idx-1)
-                        }
-                        infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx, back_idx-1, !is_front, pick_ids)
-                    }
-                    
-                })
-                
-            }).catch(function(error){
-                alert('Error occurred while generating!')
-                _this.props.mother_this.setState({being_generated:false})
-            })
-            ////////////////////////
-        }else{
-            setTimeout(function(){
-                var generated = [val_infill[val_infill_idxs[val_infill_idx]]]
-                var values = [val_infill_val[val_infill_idxs[val_infill_idx]]]
-                val_infill_idx = val_infill_idx+1
-                var text_parsed_new = JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-            
-                for(var i in generated){
-                    i = parseInt(i)
-                    // console.log(i+init_idx+1, i)
-                    if(is_front){
-                        
-                        pre_context.push(generated[i])
-                        if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
-                            text_parsed_new[i+front_idx+1]={
-                                'sentence': generated[i],
-                                'protagonist': values[i],
-                            }
-                        }
-                        
-                    }else{
-                        post_context.unshift(generated[i])
-                        if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
-                            text_parsed_new[back_idx-generated.length+i]={
-                                'sentence': generated[i],
-                                'protagonist': values[i],
-                            }
-                        }
-                        
-                    }
-                    
-                    
-                    // document.getElementById('sentence_box_'+(i+front_end+1).toString()).value = generated[i]
-                }
-                _this.props.mother_state.text_parsed[new_key] = text_parsed_new
-                // console.log('1',_this.props.mother_state.text_parsed)
-                _this.props.mother_this.setState({cur_path_id:new_key}, function(){
-                    if(is_front){
-                        if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
-                            insertASentenceToTextbox(_this, front_idx+1)
-                        }
-                        infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx+1, back_idx, !is_front, pick_ids)
-                    }else{
-                        if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
-                            insertASentenceToTextbox(_this, back_idx-1)
-                        }
-                        infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx, back_idx-1, !is_front, pick_ids)
-                    }
-                    
-                })
-                
-            }, 1000)
-        }
-        
+        control = controls.pop()
+        temp = temperature.pop()
+        regen = regeneration.pop()
     }
-  }
 
-
-  export function infilling_generation(_this, front_start, front_end, back_start, back_end, pick_ids = []){
-
-
-    var pre_context = []
-    var post_context = []
-    var controls = []
-    var temperature = []
-    var regeneration = []
-    // console.log('infilling...')
-    for(var i=front_start; i<=front_end; i++){
-        if(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][i]['sentence']==''){
-            alert('Please fill in the context.')
-            return
+    axios('/api/infillingGeneration', {
+        method: 'POST',
+        data: {
+            pre_context: JSON.stringify(pre_context),
+            post_context: JSON.stringify(post_context),
+            controls: JSON.stringify([control]),
+            characters: JSON.stringify(characters),
+            temperature: JSON.stringify([temp]),
+            regeneration: JSON.stringify([regen]),
+            is_front: is_front,
+            prev_values: is_front ? prevValues(_this.props.mother_state, front_idx) : {},
         }
-        pre_context.push(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][i]['sentence'])
-    }
-    for(var i=back_start; i<=back_end; i++){
-        if(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][i]['sentence']==''){
-            alert('Please fill in the context.')
-            return
-        }
-        post_context.push(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][i]['sentence'])
-    }
-    for(var i=front_end+1; i<back_start; i++){
-        if(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['protagonist']!=undefined){
-            if (_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['protagonist'][i]!=undefined){
-                var cval = Math.round(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['protagonist'][i]*100)
-                controls.push(cval.toString())
+    })
+    .then(function(response){
+        var generated = JSON.parse(response.data['generated'])
+        var values = JSON.parse(response.data['values'])
+        var state = _this.props.mother_state
+
+        var text_parsed_new = JSON.parse(JSON.stringify(state.text_parsed[state.cur_path_id]))
+
+        for(var i in generated){
+            i = parseInt(i)
+            var target_idx
+            if(is_front){
+                pre_context.push(generated[i])
+                target_idx = i+front_idx+1
             }else{
-                controls.push('-1')
+                post_context.unshift(generated[i])
+                target_idx = back_idx-generated.length+i
             }
-        }else{
-            controls.push('-1')
-        }
-
-        if(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_surprise']!=undefined){
-            if (_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_surprise'][i]!=undefined){
-                var sval = _this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_surprise'][i]
-                temperature.push(sval)
-            }else{
-                temperature.push(0.7)
+            if(pick_ids.length==0 || pick_ids.indexOf(target_idx)!=-1){
+                text_parsed_new[target_idx] = {'sentence': generated[i]}
+                applyValues(state, text_parsed_new[target_idx], values[i])
             }
-        }else{
-            temperature.push(0.7)
         }
-
-        if(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_regeneration']!=undefined){
-            if (_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_regeneration'][i]!=undefined){
-                var rval = _this.props.mother_state.controls[_this.props.mother_state.cur_path_id]['_regeneration'][i]
-                if(rval<2){
-                    regeneration.push(1)
-                }else{
-                    regeneration.push(rval)
+        state.text_parsed[new_key] = text_parsed_new
+        _this.props.mother_this.setState({cur_path_id:new_key}, function(){
+            if(is_front){
+                if(pick_ids.length==0 || pick_ids.indexOf(i+front_idx+1)!=-1){
+                    insertASentenceToTextbox(_this, front_idx+1)
                 }
+                infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx+1, back_idx, !is_front, pick_ids)
             }else{
-                regeneration.push(1)
+                if(pick_ids.length==0 || pick_ids.indexOf(back_idx-generated.length+i)!=-1){
+                    insertASentenceToTextbox(_this, back_idx-1)
+                }
+                infilling_call(_this, pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_idx, back_idx-1, !is_front, pick_ids)
             }
-        }else{
-            regeneration.push(1)
-        }
-    }
-    var characters = [_this.props.mother_state.characters[0]['name']]
-    // var gen_sen_num = back_start-front_end-1
-    // console.log(_this.props.mother_state.controls)
-    // console.log(pre_context, post_context, controls, characters, temperature)
+        })
+    }).catch(function(error){
+        alert(errorMessage(error))
+        _this.props.mother_this.setState({being_generated:false}, function(){
+            _this.props.mother_this.storeState('generate_error')
+        })
+    })
+}
 
-    // // when machine is not connected////////////
-    var is_front = true
-    if(pre_context.length>post_context.length){
-        is_front = false
+export function infilling_generation(_this, front_start, front_end, back_start, back_end, pick_ids = []){
+    var state = _this.props.mother_state
+    var pre_context = contextSentences(state, front_start, front_end)
+    if(pre_context==undefined){
+        return
     }
-    
-    var new_key = getNewPathId(_this)
-    _this.props.mother_state.controls[new_key] = JSON.parse(JSON.stringify(_this.props.mother_state.controls[_this.props.mother_state.cur_path_id]))
-    _this.props.mother_state.text_parsed[new_key]=JSON.parse(JSON.stringify(_this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id]))
-    _this.props.mother_state.controls[_this.props.mother_state.cur_path_id] = _this.props.mother_state.old_controls
+    var post_context = contextSentences(state, back_start, back_end)
+    if(post_context==undefined){
+        return
+    }
+    var c = collectControls(state, front_end+1, back_start)
+    var is_front = !(pre_context.length>post_context.length)
+    var new_key = branchPath(_this)
+
     _this.props.mother_this.setState({
         being_generated: true,
         cur_path_id: new_key,
     }, function(){
-        
-        infilling_call(_this,pre_context, post_context, controls, characters, temperature, regeneration, new_key, front_end, back_start, is_front, pick_ids)
+        infilling_call(_this, pre_context, post_context, c.controls, characterNames(state), c.temperature, c.regeneration, new_key, front_end, back_start, is_front, pick_ids)
     })
-    return
-    ////////////////////////////////////////////
-
-
-    var is_front = true
-    if(pre_context.length>post_context.length){
-        is_front = false
-    }
-
-    var new_key = _this.getNewPathId(_this)
-    _this.props.mother_this.setState({
-        being_generated: true
-    }, function(){
-        _this.infilling_call(_this, pre_context, post_context, controls, characters, temperature, new_key, front_end, back_start, is_front, pick_ids)
-    })
-    
-    return
-    
-
-  }
-
+}

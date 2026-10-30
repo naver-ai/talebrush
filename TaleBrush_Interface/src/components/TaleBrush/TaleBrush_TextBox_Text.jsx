@@ -5,18 +5,14 @@
 import React from 'react';
 import Nouislider from "nouislider-react";
 import "nouislider/distribute/nouislider.css";
-import axios from 'axios';
-import dl_server from './TaleBrush_var'
 import M from 'materialize-css'
-import { parse } from '@babel/core';
-import {fortuneRecognition} from './TaleBrush_Generate'
+import {fortuneRecognition, needsRating} from './TaleBrush_Generate'
 import icon_history from '../../img/icon_history.png';
 import TextareaAutosize from 'react-textarea-autosize';
 import edit from '../../img/edit.png'
 import history_default from '../../img/history_default.png'
 import history_hover from '../../img/history_hover.png'
 import history_less from '../../img/history_less.png'
-import { head } from 'lodash';
 
 
 export default class TaleBrush_TextBox_Text extends React.Component {
@@ -207,13 +203,8 @@ export default class TaleBrush_TextBox_Text extends React.Component {
         // console.log(sc, parsed[sc])
         if(parsed.length>0 && parsed[sc]!=undefined){
           // console.log('sent added?', sc, parsed[sc])
-          for(var i in this.props.mother_state.characters){
-            var character = this.props.mother_state.characters[i]
-            if(parsed[sc]['sentence'].length>1 && parsed[sc][character['_id']]==undefined){
-              fortuneRecognition(this, sc, character)
-              // parsed[sc][character['_id']] = Math.random()
-            }
-            
+          if(needsRating(this.props.mother_state, parsed[sc])){
+            fortuneRecognition(this, sc)
           }
         }
       }
@@ -240,13 +231,8 @@ export default class TaleBrush_TextBox_Text extends React.Component {
     
     var parsed = this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id]
     for(var i in parsed){
-      for(var j in this.props.mother_state.characters){
-        var character = this.props.mother_state.characters[j]
-        if(parsed[i]['sentence'].length>1 && parsed[i][character['_id']]==undefined){
-          // parsed[i][character['_id']] = Math.random()
-          fortuneRecognition(this, i, character)
-        }
-        
+      if(needsRating(this.props.mother_state, parsed[i])){
+        fortuneRecognition(this, i)
       }
     }
     var _this = this
@@ -467,49 +453,7 @@ export default class TaleBrush_TextBox_Text extends React.Component {
     this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][idx] = {'sentence':squeezed}
     // console.log(squeezed)
     var _this = this
-    if(squeezed!=''){
-      for(var i in this.props.mother_state.characters){
-        var character = this.props.mother_state.characters[i]
-
-        // // when machine is not connected
-        _this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][idx][character['_id']] = Math.random()
-        _this.props.mother_this.setState({})
-
-        // recognition should go below
-        // ////////////////////////////////////////////////////
-        // var idx_min = parseInt(idx)-2
-        // if (idx_min<0){
-        //   idx_min = 0
-        // }
-        // // var idx_min = 0
-        // var pre_context = ''
-        // // console.log(this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id])
-        // // for(var j=idx_min; j<idx; j++){
-        // //   console.log(j)
-        // //   if(this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][j]['sentence']=='' || this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][j]['sentence']==undefined){
-        // //     pre_context = ''
-        // //   }else{
-        // //     pre_context = pre_context + this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][j]['sentence']
-        // //   }
-        // // }
-
-        // axios(dl_server+'/labelSentence', {
-        //   method: 'POST',
-        //   data: {
-        //     sentence: this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][idx]['sentence'],
-        //     pre_context:pre_context,
-        //     character: this.props.mother_state.characters[0]['name'],
-        //   }
-        // })
-        // .then(function(response){
-        //   console.log(response['data']['value'])
-        //   _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id][idx][character['_id']] = response['data']['value']/100
-        //   _this.props.mother_this.setState({})
-        // })
-        // //////////////////////////////////////////
-        
-      }
-    }else{
+    if(squeezed==''){
       for(var i in this.props.mother_state.characters){
         var character = this.props.mother_state.characters[i]
         // console.log(this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id][idx])
