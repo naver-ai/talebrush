@@ -6,6 +6,7 @@ import React from 'react';
 import M from 'materialize-css'
 import TaleBrush_TextBox_Text from './TaleBrush_TextBox_Text';
 import logo from '../../img/logo.png';
+import {fortuneRecognition, needsRating} from './TaleBrush_Generate'
 
 export default class TaleBrush_TextBox extends React.Component {
     // componentDidMount(){
@@ -42,6 +43,21 @@ setSurpriseAsDuration(e){
             _this.props.mother_this.storeState('surprise_level_despecification')
             })
         }
+    }
+
+    // Relationship canvas toggle; turning it on rates existing sentences for the relationship.
+    setRelationshipAsPanel(){
+        var _this = this
+        var state = this.props.mother_state
+        this.props.mother_this.setState({relationship_in_panel: !state.relationship_in_panel}, function(){
+            _this.props.mother_this.storeState(state.relationship_in_panel?'relationship_panel_on':'relationship_panel_off')
+            var rows = state.text_parsed[state.cur_path_id]
+            for(var i in rows){
+                if(needsRating(state, rows[i])){
+                    fortuneRecognition(_this, i)
+                }
+            }
+        })
     }
 
   render() {
@@ -84,6 +100,12 @@ setSurpriseAsDuration(e){
                             <span style={{paddingLeft: '25px'}}>Surprise in separate panel.</span>
                         </label>
                     </div>
+                    {this.props.mother_state.characters.length==2 && <div style={{display:'inline-block', marginLeft:'20px'}}>
+                        <label>
+                            <input type='checkbox' id='relationship_check_panel' checked={this.props.mother_state.relationship_in_panel} onChange={this.setRelationshipAsPanel.bind(this)}></input>
+                            <span style={{paddingLeft: '25px'}}>Relationship in separate panel.</span>
+                        </label>
+                    </div>}
             </div>
             
         </div>

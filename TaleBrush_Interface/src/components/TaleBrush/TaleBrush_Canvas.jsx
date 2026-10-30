@@ -86,6 +86,44 @@ export default class TaleBrush_Canvas extends React.Component {
         </div>)
     }
 
+    // Removes the relationship track (drawn line and ratings) from every path, after confirmation.
+    clearRelationship(){
+        var state = this.props.mother_state
+        if(state.being_generated || !confirm('Clear the relationship line and its ratings?')){
+            return
+        }
+        for(var path_id in state.controls){
+            state.controls[path_id]['_relationship'] = {}
+        }
+        for(var path_id in state.text_parsed){
+            for(var i in state.text_parsed[path_id]){
+                delete state.text_parsed[path_id][i]['_relationship']
+            }
+        }
+        state.original_controls = {}
+        this.props.mother_this.storeState('clear_relationship')
+        this.props.mother_this.setState({})
+    }
+
+    // Smaller sibling of the fortune canvas: same x-axis, y from hostile (0) to close (100).
+    renderRelationshipCanvas(){
+        var state = this.props.mother_state
+        var val = {'_id': '_relationship'}
+        var label = {position:'absolute', left:'30px', width:'max-content', cursor:'default', transformOrigin:'left', transform:'rotate(-90deg)'}
+        return(<div style={{width:'100%', height: this.panelHeights().rel+'%', position:'relative', borderLeft:'solid 2px rgba(88.18, 79.45, 79.45, 0.10)', borderTop:'solid 5px white'}}>
+            <div className='canvas'></div>
+            {this.renderBands()}
+            <TaleBrush_Canvas_SenVis_Seq mother_this={this.props.mother_this} mother_state={state} val={val} palette={RELATIONSHIP_PALETTE} idx={-1}></TaleBrush_Canvas_SenVis_Seq>
+            <TaleBrush_Canvas_Draw_Area_Seq mother_this={this.props.mother_this} mother_state={state} val={val} idx={-1}></TaleBrush_Canvas_Draw_Area_Seq>
+            <div style={{position:'absolute', top:'4px', left:'12px', fontFamily:'Spoqa Han Sans Neo', fontSize:'13px', color:'rgba(10, 10, 10, 0.80)', cursor:'default', pointerEvents:'none'}}>
+                Relationship: {state.characters[0]['name']} &harr; {state.characters[1]['name']}
+            </div>
+            <div onPointerDown={this.clearRelationship.bind(this)} style={{position:'absolute', top:'4px', right:'8px', fontSize:'12px', color:'#888888', cursor:'pointer'}}>clear</div>
+            <div style={Object.assign({bottom:'0px', color:'#333333'}, label)}>Hostile</div>
+            <div style={Object.assign({top:'60px', color: RELATIONSHIP_PALETTE.color}, label)}>Close</div>
+        </div>)
+    }
+
     toggleBrushState(action_state){
         this.props.mother_this.setState({action_state})
         console.log(action_state);
@@ -396,7 +434,7 @@ export default class TaleBrush_Canvas extends React.Component {
           <input type='text' id={'character_input_'+c['_id']}
             placeholder={idx==0?'Protagonist':'Name'} spellCheck='false'
             style={{
-                display:'inline-block', width: Math.min(130, Math.max(c['name'].length, idx==0?11:4)*8.5+6)+'px', 
+                display:'inline-block', width: Math.min(130, Math.max(c['name'].length, idx==0?11:5)*8.5+6)+'px', 
                 textAlign:'left', 
                 border: 'none', backgroundColor:'transparent', resize: 'none', overflow:'visible', 
                 fontFamily: 'Spoqa Han Sans Neo', fontSize: '15.6px', fontWeight: '400', 
@@ -463,6 +501,7 @@ export default class TaleBrush_Canvas extends React.Component {
                     
                     {this.renderFortuneCanvas()}
                     {this.props.mother_state.surprise_in_panel && this.renderASurpriseCanvas()}
+                    {this.relationshipVisible() && this.renderRelationshipCanvas()}
 
 
                     {/* <div id='TB_handle' style={{position:'absolute', top: 'calc(50% - 20px)', height: '40px', left:'0px', right:'0px'}}>
