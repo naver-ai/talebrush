@@ -13,6 +13,8 @@ import cursor_b from '../../img/cursor_b.png'
 import cursor_e from '../../img/cursor_e.png'
 import generate_hover from '../../img/generate_button_hover.png'
 import generate_default from '../../img/generate_button_default.png'
+import {MAX_CHARACTERS, RELATIONSHIP_PALETTE, paletteFor, nextColor} from './TaleBrush_characters'
+import {fortuneRecognition, needsRating} from './TaleBrush_Generate'
 
 export default class TaleBrush_Canvas extends React.Component {
     constructor(props) {
@@ -28,209 +30,54 @@ export default class TaleBrush_Canvas extends React.Component {
     //     }
     // }
 
-    renderXaxis(){
-        if(this.props.mother_state.x_axis==-1){
-            return 'Sequence'
-        }else{
-            return this.props.mother_state.characters[this.props.mother_state.x_axis]['name']+"'s fortune"
-        }
+    // Heights (%) of the stacked panels: relationship panel (optional) is smaller; main + surprise share the rest.
+    panelHeights(){
+        var rel = this.relationshipVisible() ? 30 : 0
+        var n = this.props.mother_state.surprise_in_panel ? 2 : 1
+        return {rel: rel, main: (100-rel)/n}
     }
 
-    renderYaxis(idx){
-        return this.props.mother_state.characters[idx]['name']+"'s fortune"
-
+    relationshipVisible(){
+        return this.props.mother_state.relationship_in_panel && this.props.mother_state.characters.length==2
     }
 
-    toggleXaxisChoose(e){
-        e.stopPropagation()
-        // if(this.props.mother_state.action_state=='idle'){
-            if(this.props.mother_state.mode_state!='choose_x_axis'){
-                this.props.mother_this.setState({mode_state: 'choose_x_axis'})
-            }else{
-                this.props.mother_this.setState({mode_state: 'idle'})
-            }
-        // }
+    renderBands(){
+        return (<div style={{position: 'absolute', width:'100%', height:'100%'}}> 
+            <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', backgroundColor : 'rgba(255, 199, 0, 0.05)',
+                        borderRadius:'20px 20px 0px 0px'}}></div>
+            <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(229, 202, 109, 0.05)'}}></div>
+            <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(217, 217, 217, 0.05)'}}></div>
+            <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(128, 128, 128, 0.05)'}}></div>
+            <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(0, 0, 0, 0.05)',
+                        borderRadius:'0px 0px 20px 20px'}}></div>
+        </div>)
     }
 
-    toggleYaxisChoose(e){
-        e.stopPropagation()
-        // if(this.props.mother_state.action_state=='idle'){
-            if(this.props.mother_state.mode_state!='choose_y_axis'){
-                this.props.mother_this.setState({mode_state: 'choose_y_axis'})
-            }else{
-                this.props.mother_this.setState({mode_state: 'idle'})
-            }
-        // }
-    }
-
-    // XaxisChooseElement(idx){
-    //     if(idx!=-1){
-    //         var char1 = this.props.mother_state.characters[idx]
-    //         var char2 = this.props.mother_state.characters[this.props.mother_state.y_axis]
-    //         var x_controls = this.props.mother_state.controls[char1['_id']]
-    //         var y_controls = this.props.mother_state.controls[char2['_id']]
-    //         if(x_controls==undefined){x_controls={}}
-    //         if(y_controls==undefined){y_controls={}}
-    //         var full_counter = 0
-    //         var empty_exist = false
-    //         var init_overlap = -1
-    //         var overlap_end = -1
-    //         var overlap_counter = 0
-    //         // console.log(this.props.mother_state.text_prompt_range, this.props.mother_state.total_length)
-    //         for (var i=this.props.mother_state.text_prompt_range+1; i<this.props.mother_state.total_length; i++){
-    //             console.log('no at all?')
-    //             if(x_controls[i]==undefined || y_controls[i]==undefined){
-    //                 empty_exist = true
-    //             }
-    //             if(x_controls[i]==undefined && y_controls[i]==undefined){
-    //                 full_counter = full_counter + 1
-    //             }
-    //             if(x_controls[i]!=undefined || y_controls[i]!=undefined){
-    //                 overlap_counter = overlap_counter + 1
-    //             }
-    //             if(x_controls[i]!=undefined && y_controls[i]!=undefined){
-                    
-    //                 if(init_overlap==-1){
-    //                     init_overlap = i
-    //                 }
-    //                 if(init_overlap!=-1){
-    //                     overlap_end = i
-    //                 }
-    //             }
-    //         }
-
-
-
-    //         console.log(empty_exist)
-    //         if(init_overlap==this.props.mother_state.text_prompt_range+1 && overlap_end-init_overlap+1==overlap_counter){
-    //             this.props.mother_this.setState({x_axis: idx,mode_state: 'idle'})  
-                
-    //         }
-    //         else if(full_counter==this.props.mother_state.total_length-this.props.mother_state.text_prompt_range-1){
-    //             // just let it change
-    //             this.props.mother_this.setState({x_axis: idx,mode_state: 'idle'})   
-    //         }else if(empty_exist){
-    //             if(confirm("As you did not fully specify controls for both characters, they will be reset. Will you proceed?")){
-    //                 this.props.mother_state.controls[char1['_id']] = undefined
-    //                 this.props.mother_state.controls[char2['_id']] = undefined
-    //                 this.props.mother_this.setState({x_axis: idx,mode_state: 'idle'})
-    //             }
-    //         }else{
-    //             // just let it change
-    //             console.log('passing here')
-    //             this.props.mother_this.setState({x_axis: idx,mode_state: 'idle'})
-    //         }
-    //     }else{
-    //         this.props.mother_this.setState({x_axis: idx,mode_state: 'idle'})
-    //     }
-    // }
-
-    // renderXaxisChoose(){
-    //     return (<div style={{position:'absolute', bottom:'50px', right: '0px', padding: '10px', backgroundColor: '#333333', color: 'white', borderRadius: '5px'}}>
-    //         {this.props.mother_state.x_axis!=-1 && <div onPointerDown={this.XaxisChooseElement.bind(this, -1)} style={{cursor: 'default'}}>Sequence</div>}
-    //         {this.props.mother_state.characters.map((val, idx)=>{
-    //             if(idx!=this.props.mother_state.x_axis && idx!= this.props.mother_state.y_axis){
-    //                 return (<div key={'xaxischoose_'+idx} onPointerDown={this.XaxisChooseElement.bind(this, idx)} style={{cursor: 'default'}}>
-    //                     {val['name']}'s fortune
-    //                 </div>)
-    //             }
-    //         })}
-    //     </div>)
-    // }
-
-    // YaxisChooseElement(idx){
-    //     var char1 = this.props.mother_state.characters[this.props.mother_state.x_axis]
-    //     var char2 = this.props.mother_state.characters[idx]
-    //     var x_controls = this.props.mother_state.controls[char1['_id']]
-    //     var y_controls = this.props.mother_state.controls[char2['_id']]
-    //     if(x_controls==undefined){x_controls={}}
-    //     if(y_controls==undefined){y_controls={}}
-    //     var full_counter = 0
-    //     var empty_exist = false
-    //     for (var i=this.props.mother_state.text_prompt_range+1; i<this.props.mother_state.total_length; i++){
-    //         if(x_controls[i]==undefined || y_controls[i]==undefined){
-    //             empty_exist = true
-    //         }
-    //         if(x_controls[i]==undefined && y_controls[i]==undefined){
-    //             full_counter = full_counter + 1
-    //         }
-    //     }
-    //     console.log(full_counter, this.props.mother_state.total_length-this.props.mother_state.text_prompt_range)
-    //     if(full_counter==this.props.mother_state.total_length-this.props.mother_state.text_prompt_range-1){
-    //         // just let it change
-    //         this.props.mother_this.setState({y_axis: idx,mode_state: 'idle'})   
-    //     }else if(empty_exist){
-    //         if(confirm("As you did not fully specify controls for both characters, they will be reset. Will you proceed?")){
-    //             this.props.mother_state.controls[char1['_id']] = undefined
-    //             this.props.mother_state.controls[char2['_id']] = undefined
-    //             this.props.mother_this.setState({y_axis: idx,mode_state: 'idle'})
-    //         }
-    //     }else{
-    //         // just let it change
-    //         this.props.mother_this.setState({y_axis: idx,mode_state: 'idle'})
-    //     }
-    // }
-
-    // renderYaxisChoose(){
-    //     return (<div style={{position:'absolute', top: '0px', left: '40px', padding: '10px', backgroundColor: '#333333', color:'white', borderRadius:'5px'}}>
-    //         {this.props.mother_state.characters.map((val, idx)=>{
-    //             if(idx!=this.props.mother_state.y_axis && idx!=this.props.mother_state.x_axis){
-    //                 return (<div key={'yaxischoose_'+idx} onPointerDown={this.YaxisChooseElement.bind(this, idx)} style={{cursor: 'default'}}>
-    //                     {val['name']}'s fortune
-    //                 </div>)
-    //             }
-    //         })}
-    //     </div>)
-        
-    // }
-
-    renderSequenceCanvases(){
-        return this.props.mother_state.characters.map((val, idx)=>{
-            return this.renderACanvas(val, idx)
-        })
-
-    }
-
-    
-
-    renderACanvas(val, idx){
-        var additional = 0
-        if(this.props.mother_state.surprise_in_panel){
-            additional = 1
-        }
+    // One fortune canvas holding every character's layer: inactive layers are drawn first and faded,
+    // the active layer on top; only the active layer receives pointer input.
+    renderFortuneCanvas(){
+        var state = this.props.mother_state
+        var active = state.characters.filter(function(c){ return c['_id']==state.active_character })
+        var inactive = state.characters.filter(function(c){ return c['_id']!=state.active_character })
+        var layer = (c, faded) => (
+            <div key={'layer_'+c['_id']} style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', opacity: faded?0.28:1, pointerEvents:'none'}}>
+                <TaleBrush_Canvas_SenVis_Seq mother_this={this.props.mother_this} mother_state={state} val={c} palette={paletteFor(c)} hide_background={faded} idx={0}></TaleBrush_Canvas_SenVis_Seq>
+            </div>)
         return(<div style={{
             width:'100%', 
-            height: 100/(this.props.mother_state.characters.length+additional)+'%', 
+            height: this.panelHeights().main+'%', 
             position:'relative', 
             borderLeft:'solid 2px rgba(88.18, 79.45, 79.45, 0.10)'}}>
             <div className='canvas'></div>
-            {val['_id']!='_surprise' && <div style={{position: 'absolute', width:'100%', height:'100%'}}> 
-                <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', backgroundColor : 'rgba(255, 199, 0, 0.05)',
-                            borderRadius:'20px 20px 0px 0px'}}></div>
-                <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(229, 202, 109, 0.05)'}}></div>
-                <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(217, 217, 217, 0.05)'}}></div>
-                <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(128, 128, 128, 0.05)'}}></div>
-                <div style={{display:'block', width:'100%', height:'calc(20% - 4px)', marginTop:'5px', backgroundColor : 'rgba(0, 0, 0, 0.05)',
-                            borderRadius:'0px 0px 20px 20px'}}></div>
-            </div>} 
-            
-            
-            <TaleBrush_Canvas_SenVis_Seq mother_this={this.props.mother_this} mother_state={this.props.mother_state} val={val} idx={idx}></TaleBrush_Canvas_SenVis_Seq>
-            <TaleBrush_Canvas_Draw_Area_Seq mother_this={this.props.mother_this} mother_state={this.props.mother_state} val={val} idx={idx}></TaleBrush_Canvas_Draw_Area_Seq>
-            {/* <div style={{position:'absolute', bottom: '0px', left: '30px', width: 'max-content', color: '#880000', cursor:'default', transformOrigin:'left', transform:'rotate(-90deg)'}}>Bad Fortune</div> */}
-            {/* <div style={{position:'absolute', top: '90px', left: '30px', width: 'max-content', color: '#008800', cursor:'default', transformOrigin:'left', transform:'rotate(-90deg)'}}>Good Fortune</div> */}
-            {/* <div style={{position:'absolute', top: '0', left: '0', transformOrigin:'left', transform: 'rotate(-90deg)'}}>
-                <div style={{position:'absolute', top: '20px', right: '5px', width: 'max-content', color: this.props.mother_state.x_axis_color, cursor:'default'}}>{this.renderXaxis()}</div>
-            </div> */}
+            {this.renderBands()}
+            {inactive.map((c)=>layer(c, true))}
+            {active.map((c)=>layer(c, false))}
+            {active.map((c)=><TaleBrush_Canvas_Draw_Area_Seq key={'draw_'+c['_id']} mother_this={this.props.mother_this} mother_state={state} val={c} idx={0}></TaleBrush_Canvas_Draw_Area_Seq>)}
         </div>)
     }
 
     renderASurpriseCanvas(){
-        var additional = 0
-        if(this.props.mother_state.surprise_in_panel){
-            additional = 1
-        }
-        return(<div style={{width:'100%', height: 100/(this.props.mother_state.characters.length+additional)+'%', position:'relative', borderBottom:'solid 5px white'}}>
+        return(<div style={{width:'100%', height: this.panelHeights().main+'%', position:'relative', borderBottom:'solid 5px white'}}>
             <div className='canvas'></div>
             <TaleBrush_Canvas_SenVis_Seq mother_this={this.props.mother_this} mother_state={this.props.mother_state} val={{'_id': '_surprise'}} idx={-1} notrendersent={true}></TaleBrush_Canvas_SenVis_Seq>
             <TaleBrush_Canvas_Draw_Area_Seq mother_this={this.props.mother_this} mother_state={this.props.mother_state} val={{'_id': '_surprise'}} idx={-1}></TaleBrush_Canvas_Draw_Area_Seq>
@@ -451,23 +298,125 @@ export default class TaleBrush_Canvas extends React.Component {
 
   changeCharacterName(idx, e){
     if(this.props.mother_state.being_generated==false){
-    //   var charactername = prompt(idx)
-    // console.log(idx, e)
       this.props.mother_state.characters[idx]['name'] = e.target.value
       this.props.mother_this.setState({})
     }
-    
   }
 
   reviseCharacterName(idx, e){
     if(this.props.mother_state.being_generated==false){
-    //   var charactername = prompt(idx)
-    console.log(idx, e)
-      this.props.mother_state.characters[idx]['name'] = e.target.value
-      this.props.mother_this.storeState('change_protagonist_name')
+      var state = this.props.mother_state
+      var name = e.target.value.trim()
+      // names are the prompt keys, so they must be unique
+      if(name!='' && state.characters.some(function(c, i){ return i!=idx && c['name'].toLowerCase()==name.toLowerCase() })){
+        alert('Another character already has this name. Please pick a different one.')
+        name = ''
+      }
+      state.characters[idx]['name'] = name
+      this.props.mother_this.storeState('change_character_name')
       this.props.mother_this.setState({})
+      // rate existing sentences for a newly named character
+      var rows = state.text_parsed[state.cur_path_id]
+      for(var i in rows){
+        if(needsRating(state, rows[i])){
+          fortuneRecognition(this, i)
+        }
+      }
     }
-    
+  }
+
+  setActiveCharacter(_id){
+    if(this.props.mother_state.being_generated==false && this.props.mother_state.active_character!=_id){
+      var _this = this
+      this.props.mother_this.setState({active_character: _id}, function(){
+        _this.props.mother_this.highlightSentence(_this.props.mother_state.text, _this.props.mother_state.text_parsed[_this.props.mother_state.cur_path_id])
+      })
+    }
+  }
+
+  addCharacter(){
+    var state = this.props.mother_state
+    if(state.being_generated){
+      return
+    }
+    if(state.characters.length>=MAX_CHARACTERS){
+      alert('TaleBrush supports up to '+MAX_CHARACTERS+' characters for now.')
+      return
+    }
+    var _id = Math.random().toString(36).substring(7)
+    for(var path_id in state.controls){
+      state.controls[path_id][_id] = {}
+    }
+    state.characters.push({_id: _id, name: '', color: nextColor(state.characters)})
+    this.props.mother_this.setState({active_character: _id}, function(){
+      // after the click's own focus change, otherwise the input loses focus again
+      setTimeout(function(){ document.getElementById('character_input_'+_id).focus() }, 0)
+    })
+  }
+
+  // Deletes the character's layer data (controls and ratings) in every path.
+  deleteCharacter(_id, e){
+    e.stopPropagation()
+    var state = this.props.mother_state
+    if(state.being_generated || state.characters.length<2){
+      return
+    }
+    var idx = state.characters.findIndex(function(c){ return c['_id']==_id })
+    if(!confirm('Delete '+(state.characters[idx]['name'] || 'this character')+' and its layer? This cannot be undone.')){
+      return
+    }
+    state.characters.splice(idx, 1)
+    for(var path_id in state.controls){
+      delete state.controls[path_id][_id]
+    }
+    for(var path_id in state.text_parsed){
+      for(var i in state.text_parsed[path_id]){
+        delete state.text_parsed[path_id][i][_id]
+      }
+    }
+    state.original_controls = {}
+    state.added_control_ids = []
+    var _this = this
+    this.props.mother_this.setState({active_character: state.characters[0]['_id']}, function(){
+      _this.props.mother_this.storeState('remove_character')
+      _this.props.mother_this.highlightSentence(state.text, state.text_parsed[state.cur_path_id])
+    })
+  }
+
+  // Character chips double as picker and legend (dot = layer colour, solid border = active).
+  renderCharacterChips(){
+    var state = this.props.mother_state
+    var chips = state.characters.map((c, idx)=>{
+      var active = c['_id']==state.active_character
+      return (<div key={c['_id']} onPointerDown={this.setActiveCharacter.bind(this, c['_id'])} style={{
+          display: 'inline-block', verticalAlign:'middle', marginRight:'8px',
+          height: '36px', border: '1.2px solid '+(active?'currentColor':'#bbbbbb'), borderRadius:'8px', padding:'4px 10px 4px 10px',
+          opacity: active?1:0.6, cursor:'default'}}>
+          <span style={{display:'inline-block', verticalAlign:'middle', width:'10px', height:'10px', borderRadius:'50%', backgroundColor: paletteFor(c).color, marginRight:'6px', marginTop:'-2px'}}></span>
+          <input type='text' id={'character_input_'+c['_id']}
+            placeholder={idx==0?'Protagonist':'Name'} spellCheck='false'
+            style={{
+                display:'inline-block', width: Math.min(130, Math.max(c['name'].length, idx==0?11:4)*8.5+6)+'px', 
+                textAlign:'left', 
+                border: 'none', backgroundColor:'transparent', resize: 'none', overflow:'visible', 
+                fontFamily: 'Spoqa Han Sans Neo', fontSize: '15.6px', fontWeight: '400', 
+                lineHeight: '140%', color: 'rgba(10, 10, 10, 0.80)',
+                marginTop:'2px', height: '20px'
+                }}
+            value = {c['name']}
+            onChange={this.changeCharacterName.bind(this, idx)}
+            onBlur={this.reviseCharacterName.bind(this, idx)}
+            disabled = {state.being_generated}
+            ></input>
+          {state.characters.length>1 && <span title='Remove character' onPointerDown={this.deleteCharacter.bind(this, c['_id'])} style={{marginLeft:'4px', color:'#888888', cursor:'pointer'}}>&times;</span>}
+        </div>)
+    })
+    return (<div>
+        {chips}
+        <div title='Add a character' onPointerDown={this.addCharacter.bind(this)} style={{
+            display:'inline-block', verticalAlign:'middle', height:'36px', width:'36px', textAlign:'center',
+            border:'1.2px dashed #bbbbbb', borderRadius:'8px', lineHeight:'31px', fontSize:'20px', color:'#888888', cursor:'pointer'}}>+</div>
+    </div>)
   }
 
   render() {
@@ -483,42 +432,7 @@ export default class TaleBrush_Canvas extends React.Component {
             {/* <h4>TaleBrush</h4> */}
             
             <div style={{marginTop:'134px', marginLeft: '10%'}}>
-                <div id='protagonist_container' 
-                    style={{
-                        display: 'inline-block', verticalAlign:'middle', 
-                        height: '36px', width:'108px',
-                        border: '1.2px solid', borderRadius:'8px', padding:'4px 10px 4px 10px'}}>
-                    
-                    <input type='text' id='protagonist_input' 
-                    placeholder='Protagonist' spellCheck='false'
-                    style={{
-                        display:'inline-block', minWidth:'50px', 
-                        textAlign:'left', content:'attr(placeholder)',
-                        border: 'none', backgroundColor:'transparent', resize: 'none', overflow:'visible', 
-                        fontFamily: 'Spoqa Han Sans Neo', fontSize: '15.6px', fontWeight: '400', 
-                        lineHeight: '140%', color: 'rgba(10, 10, 10, 0.80)',
-                        marginTop:'2px', height: '20px'
-                        }}
-
-                    value = {this.props.mother_state.characters[0]['name']}
-                    onInput={(event) =>{
-                        var l =(document.getElementById("protagonist_input").offsetWidth);
-                        document.getElementById("protagonist_container").style.width= (l+22)+'px';
-                        // console.log(l);
-                    }}
-                    onChange={this.changeCharacterName.bind(this, 0)}
-                    onBlur={this.reviseCharacterName.bind(this, 0)}
-                    disabled = {this.props.mother_state.being_generated}
-                    ></input>
-
-                </div> 
-                <div style={{
-                    display:'inline-block', position:'absolute',
-                    fontFamily: 'Spoqa Han Sans Neo', fontSize: '15.6px', fontWeight: '400', 
-                    color: 'rgba(10, 10, 10, 0.80)',
-                    marginLeft:'6px', marginTop:'5px'
-                    }}> 's fortune
-                </div>  
+                {this.renderCharacterChips()}
             </div>     
 
             <div 
@@ -547,9 +461,8 @@ export default class TaleBrush_Canvas extends React.Component {
                                     borderRadius:'0px 0px 20px 20px'}}></div>
                     </div> */}
                     
-                    {this.props.mother_state.x_axis==-1 && this.renderSequenceCanvases()}
-                    {this.props.mother_state.x_axis==-1 && this.props.mother_state.surprise_in_panel && this.renderASurpriseCanvas()}
-                    {/* {this.props.mother_state.x_axis!=-1 && this.render2DCanvas()} */}
+                    {this.renderFortuneCanvas()}
+                    {this.props.mother_state.surprise_in_panel && this.renderASurpriseCanvas()}
 
 
                     {/* <div id='TB_handle' style={{position:'absolute', top: 'calc(50% - 20px)', height: '40px', left:'0px', right:'0px'}}>
@@ -565,7 +478,7 @@ export default class TaleBrush_Canvas extends React.Component {
             <div style={{position:'absolute', width:'100%', marginLeft:'-11px', bottom:'40px', textAlign:'center'}}>
                 <div style={{position:'absolute', display:'inline-block', marginLeft:'-4px', width:'128px', height:'60px', backgroundColor:'gray', borderRadius:'10px', zIndex:'-1'}}/>
                 <div style={{display:'inline-block'}}>
-                    {this.props.mother_state.x_axis==-1 && <div style={{marginRight: '10px'}}>
+                    {<div style={{marginRight: '10px'}}>
                         <div className='btn' style={{backgroundColor:'transparent', width:'60px', boxShadow:'none', height:'60px'}}
                         onPointerDown={this.toggleBrushState.bind(this, 'brush')}>
                             <img src={(this.props.mother_state.action_state=='erase')?pen_on:pen_off} style={{

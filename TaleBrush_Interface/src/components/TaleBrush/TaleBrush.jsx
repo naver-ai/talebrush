@@ -9,6 +9,7 @@ import TaleBrush_TextBox from './TaleBrush_TextBox';
 import {continuing_generation, infilling_generation} from './TaleBrush_Generate'
 import cursor_b from '../../img/cursor_b.png'
 import cursor_e from '../../img/cursor_e.png'
+import {PALETTES} from './TaleBrush_characters'
 
 export default class TaleBrush extends React.Component {
   constructor(props) {
@@ -34,7 +35,9 @@ export default class TaleBrush extends React.Component {
       x_axis_color: '#000088',
       y_axis_color: '#880000',
 
-      characters: [{_id:'protagonist', name:''}],
+      characters: [{_id:'protagonist', name:'', color:PALETTES[0].color}],
+      active_character: 'protagonist', // the layer that drawing/erasing and the text highlights follow
+      relationship_in_panel: false,
       total_length: 8, 
 
       text: '>\n>\n>\n>\n>\n>\n>\n>',
@@ -51,7 +54,7 @@ export default class TaleBrush extends React.Component {
       text_back_prompt_end: -1, 
       text_generation_end: 7, 
 
-      controls: {'0':{'protagonist':{}, '_surprise':{}, '_regeneration':{},}},
+      controls: {'0':{'protagonist':{}, '_relationship':{}, '_surprise':{}, '_regeneration':{},}},
       control_times: {'protagonist': [], '_surprise':[], '_regeneration': []},
       controls_drawn: {},
 
@@ -248,7 +251,7 @@ export default class TaleBrush extends React.Component {
       this.state.text= ">Jack's favorite animal is panda.\n>Therefore, Jack went to a zoo to see pandas.\n>\n>\n>\n>\n>\n>"
     }
 
-    this.setState({text_parsed, user, logging, characters: [{_id:'protagonist', name:char_name}]}, function(){
+    this.setState({text_parsed, user, logging, characters: [{_id:'protagonist', name:char_name, color:PALETTES[0].color}]}, function(){
       var init_state = JSON.parse(JSON.stringify(_this.state))
       // _this.state.init_state = init_state
       console.log(init_state)
@@ -290,8 +293,8 @@ export default class TaleBrush extends React.Component {
       
       // console.log(i)
         var backgroundColor='transparent'
-        if(parsed[i]['protagonist']!=undefined){
-          var ratio = parsed[i]['protagonist']
+        if(parsed[i][this.state.active_character]!=undefined){
+          var ratio = parsed[i][this.state.active_character]
 
           if(ratio > 0.8) {
             backgroundColor = 'rgba(255, 199, 0, 0.1)'

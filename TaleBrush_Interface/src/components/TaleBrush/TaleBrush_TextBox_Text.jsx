@@ -36,87 +36,6 @@ export default class TaleBrush_TextBox_Text extends React.Component {
     });
   }
 
-  reviseCharacterName(idx){
-    if(this.props.mother_state.being_generated==false){
-      var charactername = prompt('Rename the character')
-      this.props.mother_state.characters[idx]['name'] = charactername
-      this.props.mother_this.storeState('change_protagonist_name')
-      this.props.mother_this.setState({})
-    }
-    
-  }
-
-  deleteCharacter(idx){
-    // TODO we might need to do additional deletion process here... 
-    if(this.props.mother_state.characters.length>1){
-      if(confirm('Are you sure to delete this character?')){
-
-        this.props.mother_state.characters.splice(idx, 1)
-        // var y_axis = this.props.mother_state.y_axis
-        var x_axis = this.props.mother_state.x_axis
-        // console.log(idx, x_axis, y_axis)
-        
-        // if(y_axis==idx){
-        //   y_axis = 0
-        //   if(x_axis==0){
-        //     y_axis = 1
-        //   }
-        // }else 
-        if(x_axis==idx){
-          x_axis = -1
-        }
-        // if(y_axis>idx){
-        //   y_axis = y_axis-1
-        // }else 
-        if(x_axis>idx){
-          x_axis = x_axis-1
-        }
-        // console.log(idx, x_axis, y_axis)
-        // this.props.mother_this.setState({y_axis, x_axis})
-        this.props.mother_this.setState({x_axis})
-        
-      }
-    }else{
-      alert('There should be at least one character!')
-    }
-    
-  }
-
-  renderCharacters(){
-    return this.props.mother_state.characters.map((val, idx)=>{
-      return (<div style={{border: 'solid 1px black', padding: '3px', margin: '2px', display:'flex'}}>
-        Protagonist:
-        <div style={{flex: 'auto'}}>{val['name']}</div>
-        <div style={{display: 'inline-flex'}}>
-          <div onPointerDown={this.reviseCharacterName.bind(this, idx)} style={{marginRight:'3px', color:(this.props.mother_state.being_generated)?'#eeeeee':''}}><i class="fa fa-pencil" aria-hidden="true"></i></div>
-          {/* <div onPointerDown={this.deleteCharacter.bind(this, idx)}><i class="fa fa-trash" aria-hidden="true"></i></div> */}
-        </div>
-      </div>)
-    })
-  }
-
-  addCharacter(){
-    if(this.props.mother_state.characters.length<4){
-      var charactername = prompt('Name the character')
-      var _id = Math.random().toString(36).substring(7)
-
-      // TODO add sentiment analysis result 
-      var text_parsed = this.props.mother_state.text_parsed[this.props.mother_state.cur_path_id]
-      // TODO send request here, maybe...
-      for(var i in text_parsed){
-        text_parsed[i][_id] = Math.random()
-      }
-
-      this.props.mother_state.characters.push({_id:_id, name: charactername, is_protagonist: false})
-      this.props.mother_this.setState({})
-    }else{
-      alert('There would be too many characters to handle')
-    }
-    
-  }
-
-
-
   renderSentenceHighlights(){
     
     return this.props.mother_state.text
@@ -1038,8 +957,8 @@ export default class TaleBrush_TextBox_Text extends React.Component {
     console.log('test')
   }
   checkCharacterName(){
-    if(this.props.mother_state.characters[0]['name']==''){
-      alert('Please first set the name of protagonist.')
+    if(this.props.mother_state.characters.some(function(c){ return c['name']=='' })){
+      alert('Please first set the names of the characters.')
       document.getElementById('textarea').blur()
     }
   }

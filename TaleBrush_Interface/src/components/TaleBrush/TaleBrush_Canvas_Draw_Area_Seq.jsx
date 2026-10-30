@@ -17,8 +17,8 @@ export default class TaleBrush_Canvas_Draw_Area_Seq extends React.Component {
     if(this.props.mother_state.being_generated){
       return
     }
-    if(this.props.mother_state.characters[0]['name']==''){
-      alert("Please first specify the protagonist's name.")
+    if(this.props.mother_state.characters.some(function(c){ return c['name']=='' })){
+      alert("Please first specify the names of the characters.")
       return
     }
       var _this = this
@@ -76,6 +76,13 @@ export default class TaleBrush_Canvas_Draw_Area_Seq extends React.Component {
               this.props.mother_state.added_control_ids.push(i)
             }
             
+            var path_controls = this.props.mother_state.controls[this.props.mother_state.cur_path_id]
+            if(path_controls[val['_id']]==undefined){
+              path_controls[val['_id']] = {}
+            }
+            if(path_controls['_regeneration']==undefined){
+              path_controls['_regeneration'] = {}
+            }
             if(this.props.mother_state.original_controls[i]==undefined && val['_id']!='_surprise'){
                 this.props.mother_state.original_controls[i] = [this.props.mother_state.controls[this.props.mother_state.cur_path_id][val['_id']][i], this.props.mother_state.controls[this.props.mother_state.cur_path_id]['_regeneration'][i]]
             }

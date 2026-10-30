@@ -74,6 +74,9 @@ export function needsRating(state, row){
     if(row==undefined || row['sentence']==undefined || row['sentence'].length<=1){
         return false
     }
+    if(state.characters.some(function(c){ return c['name']=='' })){
+        return false
+    }
     var missing = state.characters.some(function(c){ return row[c['_id']]==undefined })
     return missing || (relationshipActive(state) && row['_relationship']==undefined)
 }

@@ -24,6 +24,25 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
     }
   }
   
+  // Colours of this layer (character/relationship palette from the parent; defaults = original colours).
+  pal(){
+    return Object.assign({}, this.state, this.props.palette)
+  }
+
+  // Gradient ids are per layer, otherwise two layers on one canvas would share (and overwrite) them.
+  gradId(name){
+    return 'url(#'+name+'_'+this.props.val._id+')'
+  }
+
+  // A layer mounted later (e.g. a newly added character) renders before componentDidMount has set the generator.
+  getGenerator(){
+    if(this.state.generator){
+      return this.state.generator
+    }
+    var rect = document.getElementById('whole_canvas').getBoundingClientRect()
+    return rough.generator({}, {width: rect.width, height: rect.height})
+  }
+
   componentDidMount(){
     console.log(document.getElementById('whole_canvas'))
     var generator = rough.generator({},{width:document.getElementById('whole_canvas').getBoundingClientRect().width, height:document.getElementById('whole_canvas').getBoundingClientRect().height})
@@ -36,7 +55,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
     // var svg = document.getElementById('control_svg')
     // var rc = rough.svg(svg)
     // svg.appendChild(rc.line(0, 0, 50, 50, {
-    //   stroke:'url(#grad_control)'
+    //   stroke:this.gradId('grad_control')
     // }))
   }
 
@@ -44,11 +63,11 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
     if(this.props.val['_id']!='_surprise'){
       var color1, color2
       if(path_id == this.props.mother_state.cur_path_id){
-        color1 = 'url(#grad_control)'
-        color2 = 'url(#grad_control_area)'
+        color1 = this.gradId('grad_control')
+        color2 = this.gradId('grad_control_area')
       }else{
-        color1 = this.state.control_color
-        color2 = this.state.control_color
+        color1 = this.pal().control_color
+        color2 = this.pal().control_color
       }
       return (<g>
         {this.renderBezierRange(this.props.mother_state.controls[path_id][this.props.val._id], this.props.mother_state.controls[path_id]['_regeneration'], 1, color2, 0.5, path_id+'_control')}
@@ -56,7 +75,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
       </g>)
     }else{
       return (<g>
-        {this.renderBezier(this.props.mother_state.controls[path_id][this.props.val._id], this.state.control_width, this.state.control_color, 1, path_id+'_surprise')}
+        {this.renderBezier(this.props.mother_state.controls[path_id][this.props.val._id], this.state.control_width, this.pal().control_color, 1, path_id+'_surprise')}
       </g>)
     }
 
@@ -74,9 +93,9 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
     }
     var color
     if(path_id==this.props.mother_state.cur_path_id){
-      color = 'url(#grad_control2)'
+      color = this.gradId('grad_control2')
     }else{
-      color = this.state.generated_color
+      color = this.pal().generated_color
     }
     // console.log(control)
     return (<g>{this.renderBezier(control, this.state.generated_width, color, 1, path_id+'_generated')}</g>)
@@ -145,7 +164,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
       }
       
       if(path!='M '){
-        var generator = this.state.generator
+        var generator = this.getGenerator()
         if(generator!=undefined){
           var p_obj = generator.path(path, {'roughness': 0.4})
           var p = generator.toPaths(p_obj)
@@ -168,7 +187,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
     }
     if(document.getElementById('whole_canvas')!=undefined){
       // var generator = rough.generator({},{width:document.getElementById('whole_canvas').getBoundingClientRect().width, height:document.getElementById('whole_canvas').getBoundingClientRect().height})
-      var generator = this.state.generator
+      var generator = this.getGenerator()
       // console.log(control)
       var control_keyss = Object.keys(control)
       var control_regen_keys = Object.keys(control_regen)
@@ -358,11 +377,11 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
           // console.log(p)
           return (<g>
             <defs>
-              <pattern id={'br_rough_'+idx.toString()} x={p[0]['pattern']['x']} y={p[0]['pattern']['y']} width={p[0]['pattern']['width']} height={p[0]['pattern']['height']} viewBox={p[0]['pattern']['viewBox']} patternUnits={p[0]['pattern']['objectBoundingBox']}>
+              <pattern id={'br_rough_'+this.props.val._id+'_'+idx.toString()} x={p[0]['pattern']['x']} y={p[0]['pattern']['y']} width={p[0]['pattern']['width']} height={p[0]['pattern']['height']} viewBox={p[0]['pattern']['viewBox']} patternUnits={p[0]['pattern']['objectBoundingBox']}>
                 <path d={p[0]['pattern']['path']['d']} stroke={color} strokeWidth={p[0]['pattern']['path']['strokeWidth']}  fill={p[0]['pattern']['path']['fill']}></path>
               </pattern>
             </defs>
-            <path d={p[0]['d']} stroke={'transparent'} opacity={opacity} fill={'url(#br_rough_'+idx.toString()+')'} strokeWidth={width} strokeLinecap="round"></path>
+            <path d={p[0]['d']} stroke={'transparent'} opacity={opacity} fill={'url(#br_rough_'+this.props.val._id+'_'+idx.toString()+')'} strokeWidth={width} strokeLinecap="round"></path>
           </g>)
           // return (<path d={p[0]['pattern']['path']['d']} stroke={color} opacity='0.2' fill={color} strokeWidth={width} strokeLinecap="round"></path>)
         }
@@ -423,7 +442,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
       return
     }
     // var generator = rough.generator({},{width:document.getElementById('whole_canvas').getBoundingClientRect().width, height:document.getElementById('whole_canvas').getBoundingClientRect().height})
-    var generator = this.state.generator
+    var generator = this.getGenerator()
     // console.log('seeequence?', controls, this.props.val._id)
     if(controls!=undefined){
       var sequences =  [...Array(this.props.mother_state.total_length).keys()]
@@ -452,12 +471,12 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
               // var y = 'calc('+((1-controls[key])*100)+'% -5px)'
               // // console.log(y)
               // var opacity =this.props.mother_state.controls[path_id]['_regeneration'][key]/2
-              var color = this.state.control_color
+              var color = this.pal().control_color
               if(path_id==this.props.mother_state.cur_path_id && this.props.val._id!='_surprise'){
                 if(this.props.mother_state.original_controls!=undefined){
                   // console.log(Object.keys(this.props.mother_state.original_controls), key)
                   if(Object.keys(this.props.mother_state.original_controls).indexOf(key.toString())!=-1){
-                    color=this.state.control_color_new
+                    color=this.pal().control_color_new
                   }
                 }
               }
@@ -473,7 +492,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
             // console.log('rendering?')
             var x = (key/this.props.mother_state.total_length*100-0.5)+'%'
             var y = ((1)*100-0.5)+'%' 
-            return (<div className='sentence_dot' style={{border: 'solid 1px white', left: x, top: y, backgroundColor: this.state.control_color}}></div>)
+            return (<div className='sentence_dot' style={{border: 'solid 1px white', left: x, top: y, backgroundColor: this.pal().control_color}}></div>)
           }
         }else{
           return
@@ -497,7 +516,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
           console.log('rendering?')
           var x = (key/this.props.mother_state.total_length*100-0.5)+'%'
           var y = ((1)*100-0.5)+'%' 
-          return (<div className='sentence_dot' style={{border: 'solid 1px white', left: x, top: y, backgroundColor: this.state.control_color}}></div>)
+          return (<div className='sentence_dot' style={{border: 'solid 1px white', left: x, top: y, backgroundColor: this.pal().control_color}}></div>)
         }
       })
 
@@ -615,7 +634,7 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
       return
     }
     // var generator = rough.generator({},{width:document.getElementById('whole_canvas').getBoundingClientRect().width, height:document.getElementById('whole_canvas').getBoundingClientRect().height})
-    var generator = this.state.generator
+    var generator = this.getGenerator()
 
     return this.props.mother_state.text_parsed[cur_path_id].map((val, idx)=>{
       if(val['sentence']!='' && idx<this.props.mother_state.total_length && val[this.props.val._id]!=undefined){
@@ -654,12 +673,12 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
         var seq = idx
         var total_length = this.props.mother_state.total_length
 
-        var color = this.state.generated_color
+        var color = this.pal().generated_color
         if(cur_path_id==this.props.mother_state.cur_path_id && this.props.val._id!='_surprise'){
           if(this.props.mother_state.original_controls!=undefined){
             // console.log(Object.keys(this.props.mother_state.original_controls), key)
             if(Object.keys(this.props.mother_state.original_controls).indexOf(idx.toString())!=-1){
-              color=this.state.generated_color_new
+              color=this.pal().generated_color_new
             }
           }
         }
@@ -694,18 +713,18 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
   renderGradientColor(path_id,option){
     var control, color
     if(option=='control' || option=='control_area'){
-      control = this.props.mother_state.controls[path_id]['protagonist']
-      color = this.state.control_color
+      control = this.props.mother_state.controls[path_id][this.props.val._id]
+      color = this.pal().control_color
     }else{
       control = {}
       var messy_c= this.props.mother_state.text_parsed[path_id]
       // console.log('messy c ', messy_c)
       for(var i in messy_c){
-        if(messy_c[i]['protagonist']!=undefined){
+        if(messy_c[i][this.props.val._id]!=undefined){
           control[i] = messy_c[i]
         }
       }
-      color = this.state.generated_color
+      color = this.pal().generated_color
     }
     // console.log(control)
     if(control==undefined){
@@ -744,9 +763,9 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
         // console.log(option, 'on this!')
         var color
         if(option=='control'||option=='control_area'){
-          color = this.state.control_color_new
+          color = this.pal().control_color_new
         }else{
-          color = this.state.generated_color_new
+          color = this.pal().generated_color_new
         }
         if(option!='control_area'){
           return (<stop offset={((val-min)/len*100)+'%'} stop-color={color}/>)
@@ -757,9 +776,9 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
       }
       var color
         if(option=='control'||option=='control_area'){
-          color = this.state.control_color
+          color = this.pal().control_color
         }else{
-          color = this.state.generated_color
+          color = this.pal().generated_color
         }
         if(option!='control_area'){
           return (<stop offset={((val-min)/len*100)+'%'} stop-color={color}/>)
@@ -773,22 +792,22 @@ export default class TaleBrush_Canvas_SenVis_Seq extends React.Component {
     return (
         <div id='whole_canvas' style={{backgroundColor: 'transparent', overflow:'hidden'}} className='canvas'>
           
-          {this.renderSentenceBars()}
-          <div style={{
+          {this.props.hide_background!=true && this.renderSentenceBars()}
+          {this.props.hide_background!=true && <div style={{
             position:'absolute', left:'0px', right:'0', height: '3px', 
             backgroundColor: 'rgba(153, 153, 153, 0.7)', borderRadius:'2px',
             top: 'calc(50% - 1px)'}}>
-          </div>
+          </div>}
           <svg viewBox='0 0 100 100' preserveAspectRatio="none" id='control_svg' style={{position:'absolute', left:0, zIndex: 0, width: '100%', height: '100%'}}>
           {/* {this.renderControlsV2()} */}
           <defs>
-            <linearGradient id="grad_control">
+            <linearGradient id={'grad_control_'+this.props.val._id}>
               {this.renderGradientColor(this.props.mother_state.cur_path_id, 'control')}
             </linearGradient>
-            <linearGradient id="grad_control_area">
+            <linearGradient id={'grad_control_area_'+this.props.val._id}>
               {this.renderGradientColor(this.props.mother_state.cur_path_id, 'control_area')}
             </linearGradient>
-            <linearGradient id="grad_control2">
+            <linearGradient id={'grad_control2_'+this.props.val._id}>
               {this.renderGradientColor(this.props.mother_state.cur_path_id, 'generated')}
             </linearGradient>
           </defs>
